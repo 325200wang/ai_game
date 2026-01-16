@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆卡牌配对游戏</title>
+    <!-- Font Awesome 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ==================== CSS 变量定义 ==================== */
+        :root {
+            /* 浅色主题配色 */
+            --bg-primary: #f0f4f8;
+            --bg-secondary: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #4a5568;
+            --accent-color: #4299e1;
+            --accent-hover: #3182ce;
+            --card-back: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-front: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --shadow-hover: rgba(0, 0, 0, 0.2);
+            
+            /* 动画变量 */
+            --flip-duration: 0.6s;
+            --hover-scale: 1.05;
+            --success-scale: 1.1;
+        }
+
+        /* 深色主题配色 */
+        [data-theme="dark"] {
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --text-primary: #e2e8f0;
+            --text-secondary: #cbd5e0;
+            --accent-color: #63b3ed;
+            --accent-hover: #4299e1;
+            --card-back: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-front: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --shadow-hover: rgba(0, 0, 0, 0.5);
+        }
+
+        /* ==================== 全局样式 ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* ==================== 顶部导航栏 ==================== */
+        .navbar {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 10px var(--shadow-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .navbar h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .navbar-controls {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* ==================== 按钮样式 ==================== */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px var(--shadow-color);
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px var(--shadow-hover);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 3px var(--shadow-color);
+        }
+
+        .btn-icon {
+            padding: 0.75rem;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ==================== 游戏区域 ==================== */
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        /* 难度选择区域 */
+        .difficulty-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .difficulty-btn {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 2px solid var(--accent-color);
+        }
+
+        .difficulty-btn.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* 卡牌网格容器 */
+        .cards-grid {
+            display: grid;
+            gap: 1rem;
+            perspective: 1000px; /* 3D透视效果 */
+            transition: all 0.3s ease;
+        }
+
+        .cards-grid.grid-4x4 {
+            grid-template-columns: repeat(4, 120px);
+            grid-template-rows: repeat(4, 120px);
+        }
+
+        .cards-grid.grid-5x5 {
+            grid-template-columns: repeat(5, 110px);
+            grid-template-rows: repeat(5, 110px);
+        }
+
+        /* ==================== 卡牌样式 ==================== */
+        .card {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            -webkit-transform-style: preserve-3d;
+            -moz-transform-style: preserve-3d;
+            -ms-transform-style: preserve-3d;
+            transition: transform var(--flip-duration) ease;
+        }
+
+        /* 翻转后的卡片 - 保持旋转状态 */
+        .card.flipped {
+            transform: rotateY(180deg) !important;
+            -webkit-transform: rotateY(180deg) !important;
+            -moz-transform: rotateY(180deg) !important;
+            -ms-transform: rotateY(180deg) !important;
+        }
+
+        /* 匹配成功的卡片 - 保持旋转状态 */
+        .card.matched {
+            transform: rotateY(180deg) !important;
+            -webkit-transform: rotateY(180deg) !important;
+            -moz-transform: rotateY(180deg) !important;
+            -ms-transform: rotateY(180deg) !important;
+            animation: matchSuccess 0.6s ease forwards;
+        }
+
+        /* 未翻转卡片的hover效果 */
+        .card:not(.flipped):not(.matched):hover {
+            transform: scale(var(--hover-scale));
+        }
+
+        /* 匹配成功后的hover不影响transform */
+        .card.matched:hover {
+            transform: rotateY(180deg) !important;
+        }
+
+        @keyframes matchSuccess {
+            0% {
+                transform: rotateY(180deg) scale(1);
+            }
+            50% {
+                transform: rotateY(180deg) scale(var(--success-scale));
+            }
+            100% {
+                transform: rotateY(180deg) scale(1);
+            }
+        }
+
+        /* 卡牌正反面 */
+        .card-face {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            transition: box-shadow 0.3s ease;
+            z-index: 1;
+            /* 确保背面隐藏 - 添加所有浏览器前缀 */
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            -moz-backface-visibility: hidden;
+            -ms-backface-visibility: hidden;
+        }
+
+        /* 卡牌背面的hover效果 - 只对未翻转的卡片生效 */
+        .card:not(.flipped):not(.matched):hover .card-back {
+            box-shadow: 0 8px 16px var(--shadow-hover);
+        }
+
+        /* 卡牌背面 - 初始显示的面 */
+        .card-back {
+            background: var(--card-back);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 磨砂玻璃效果 */
+        .card-back::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* 卡牌背面图标 */
+        .card-back i {
+            font-size: 3rem;
+            color: white;
+            z-index: 1;
+            opacity: 0.8;
+        }
+
+        /* 卡牌正面 - 翻转后显示的面 */
+        .card-front {
+            background: var(--card-front);
+            transform: rotateY(180deg);
+            -webkit-transform: rotateY(180deg);
+            -moz-transform: rotateY(180deg);
+            -ms-transform: rotateY(180deg);
+            z-index: 2;
+        }
+
+        .card-front i {
+            font-size: 3.5rem;
+            color: white;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+            z-index: 3;
+            position: relative;
+        }
+
+        /* ==================== 信息栏 ==================== */
+        .info-bar {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 2px 10px var(--shadow-color);
+            display: flex;
+            gap: 3rem;
+            align-items: center;
+            justify-content: center;
+            min-width: 600px;
+            transition: background 0.3s ease;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .info-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        /* ==================== 胜利弹窗 ==================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            padding: 3rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 500px;
+            transform: translateY(-50px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.show .modal {
+            transform: translateY(0);
+            animation: modalPop 0.5s ease forwards;
+        }
+
+        @keyframes modalPop {
+            0% {
+                transform: scale(0.8) translateY(-50px);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.05) translateY(0);
+            }
+            100% {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--accent-color);
+        }
+
+        .modal-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .modal-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .modal-stat-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .modal-stat-value {
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .modal-buttons .btn {
+            flex: 1;
+        }
+
+        /* ==================== 粒子效果 ==================== */
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleFly 1s ease-out forwards;
+        }
+
+        @keyframes particleFly {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
+
+        /* ==================== 响应式设计 ==================== */
+        @media (max-width: 768px) {
+            .navbar h1 {
+                font-size: 1.5rem;
+            }
+
+            .cards-grid.grid-4x4 {
+                grid-template-columns: repeat(4, 80px);
+                grid-template-rows: repeat(4, 80px);
+            }
+
+            .cards-grid.grid-5x5 {
+                grid-template-columns: repeat(5, 70px);
+                grid-template-rows: repeat(5, 70px);
+            }
+
+            .info-bar {
+                min-width: auto;
+                flex-wrap: wrap;
+                gap: 1.5rem;
+            }
+
+            .card-front i,
+            .card-back i {
+                font-size: 2rem;
+            }
+        }
+
+        /* ==================== 游戏控制按钮区域 ==================== */
+        .game-controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* ==================== 加载动画 ==================== */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* 应用到卡牌容器而不是单张卡牌，避免干扰3D翻转 */
+        .cards-grid {
+            animation: fadeIn 0.8s ease forwards;
+        }
+
+        /* ==================== 嘴碎小助手 ==================== */
+        .assistant-container {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .assistant-avatar {
+            font-size: 4rem;
+            background: var(--bg-secondary);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .assistant-avatar:hover {
+            transform: scale(1.1);
+        }
+
+        .assistant-dialog {
+            background: var(--bg-secondary);
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            max-width: 300px;
+            position: relative;
+            animation: dialogPop 0.3s ease;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.3s ease;
+        }
+
+        .assistant-dialog.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* 气泡三角形 */
+        .assistant-dialog::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-right: 10px solid var(--bg-secondary);
+        }
+
+        .assistant-text {
+            color: var(--text-primary);
+            font-size: 1rem;
+            line-height: 1.5;
+            min-height: 1.5em;
+        }
+
+        .assistant-typing {
+            overflow: hidden;
+            white-space: pre-wrap;
+        }
+
+        /* 助手动画 */
+        @keyframes dialogPop {
+            from {
+                opacity: 0;
+                transform: translateX(-20px) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+        }
+
+        /* 响应式：移动端调整助手位置 */
+        @media (max-width: 1024px) {
+            .assistant-container {
+                left: 10px;
+            }
+
+            .assistant-avatar {
+                width: 60px;
+                height: 60px;
+                font-size: 3rem;
+            }
+
+            .assistant-dialog {
+                max-width: 250px;
+                padding: 0.8rem 1.2rem;
+            }
+
+            .assistant-text {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .assistant-container {
+                position: relative;
+                left: 0;
+                top: 0;
+                transform: none;
+                flex-direction: row;
+                align-items: center;
+                margin-bottom: 1rem;
+                width: 100%;
+                justify-content: center;
+            }
+
+            .assistant-dialog::before {
+                left: 50%;
+                top: -10px;
+                transform: translateX(-50%);
+                border-top: 10px solid var(--bg-secondary);
+                border-bottom: 10px solid transparent;
+                border-right: 10px solid transparent;
+                border-left: 10px solid transparent;
+            }
+
+            .assistant-dialog {
+                max-width: none;
+                width: 80%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar">
+        <h1><i class="fas fa-brain"></i> 记忆卡牌配对游戏</h1>
+        <div class="navbar-controls">
+            <button class="btn btn-icon" id="themeToggle" title="切换主题">
+                <i class="fas fa-moon"></i>
+            </button>
+            <button class="btn btn-icon" id="soundToggle" title="音效控制">
+                <i class="fas fa-volume-mute"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 嘴碎小助手 -->
+    <div class="assistant-container" id="assistantContainer">
+        <div class="assistant-avatar" id="assistantAvatar">😊</div>
+        <div class="assistant-dialog" id="assistantDialog">
+            <p class="assistant-text" id="assistantText"></p>
+        </div>
+    </div>
+
+    <!-- 游戏主容器 -->
+    <div class="game-container">
+        <!-- 难度选择 -->
+        <div class="difficulty-selector">
+            <button class="btn difficulty-btn active" data-difficulty="4">4×4 简单</button>
+            <button class="btn difficulty-btn" data-difficulty="5">5×5 困难</button>
+        </div>
+
+        <!-- 卡牌网格 -->
+        <div class="cards-grid grid-4x4" id="cardsGrid"></div>
+
+        <!-- 游戏控制按钮 -->
+        <div class="game-controls">
+            <button class="btn" id="restartBtn">
+                <i class="fas fa-redo"></i> 重新开始
+            </button>
+        </div>
+
+        <!-- 信息栏 -->
+        <div class="info-bar">
+            <div class="info-item">
+                <span class="info-label">游戏时间</span>
+                <span class="info-value" id="timeDisplay">00:00</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">点击步数</span>
+                <span class="info-value" id="movesDisplay">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">最佳记录</span>
+                <span class="info-value" id="bestDisplay">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 胜利弹窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2><i class="fas fa-trophy"></i> 恭喜获胜！</h2>
+            <div class="modal-stats">
+                <div class="modal-stat">
+                    <span class="modal-stat-label">用时</span>
+                    <span class="modal-stat-value" id="modalTime">00:00</span>
+                </div>
+                <div class="modal-stat">
+                    <span class="modal-stat-label">步数</span>
+                    <span class="modal-stat-value" id="modalMoves">0</span>
+                </div>
+                <div class="modal-stat">
+                    <span class="modal-stat-label">成功率</span>
+                    <span class="modal-stat-value" id="modalAccuracy">100%</span>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn" id="playAgainBtn">
+                    <i class="fas fa-play"></i> 再玩一次
+                </button>
+                <button class="btn" id="closeModalBtn">
+                    <i class="fas fa-times"></i> 关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 游戏状态管理 ====================
+        class MemoryGame {
+            constructor() {
+                // 游戏配置
+                this.difficulty = 4; // 默认4x4
+                this.cards = [];
+                this.flippedCards = [];
+                this.matchedPairs = 0;
+                this.moves = 0;
+                this.time = 0;
+                this.timer = null;
+                this.isProcessing = false; // 防止快速点击
+                this.soundEnabled = false;
+                this.audioContext = null; // AudioContext实例，用于播放音效
+                
+                // Font Awesome 图标集合（用于卡牌正面）
+                this.icons = [
+                    'fa-star', 'fa-heart', 'fa-bolt', 'fa-crown',
+                    'fa-gem', 'fa-fire', 'fa-snowflake', 'fa-leaf',
+                    'fa-sun', 'fa-moon', 'fa-cloud', 'fa-anchor',
+                    'fa-rocket', 'fa-plane', 'fa-car', 'fa-bicycle',
+                    'fa-guitar', 'fa-music', 'fa-bell', 'fa-gift',
+                    'fa-key', 'fa-lock', 'fa-unlock', 'fa-flag',
+                    'fa-trophy'
+                ];
+
+                // DOM 元素
+                this.cardsGrid = document.getElementById('cardsGrid');
+                this.timeDisplay = document.getElementById('timeDisplay');
+                this.movesDisplay = document.getElementById('movesDisplay');
+                this.bestDisplay = document.getElementById('bestDisplay');
+                this.modalOverlay = document.getElementById('modalOverlay');
+                
+                // 初始化助手
+                this.assistant = new GameAssistant();
+                
+                // 初始化
+                this.init();
+            }
+
+            // ==================== 初始化游戏 ====================
+            init() {
+                this.bindEvents();
+                this.loadBestScore();
+                this.startNewGame();
+            }
+
+            // ==================== 绑定事件监听 ====================
+            bindEvents() {
+                // 难度切换
+                document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.difficulty = parseInt(e.target.dataset.difficulty);
+                        this.cardsGrid.className = `cards-grid grid-${this.difficulty}x${this.difficulty}`;
+                        this.loadBestScore(); // 切换难度后重新加载最佳记录
+                        this.startNewGame();
+                    });
+                });
+
+                // 重新开始
+                document.getElementById('restartBtn').addEventListener('click', () => {
+                    this.startNewGame();
+                });
+
+                // 主题切换
+                document.getElementById('themeToggle').addEventListener('click', () => {
+                    this.toggleTheme();
+                });
+
+                // 音效切换
+                document.getElementById('soundToggle').addEventListener('click', () => {
+                    this.toggleSound();
+                });
+
+                // 弹窗按钮
+                document.getElementById('playAgainBtn').addEventListener('click', () => {
+                    this.closeModal();
+                    this.startNewGame();
+                });
+
+                document.getElementById('closeModalBtn').addEventListener('click', () => {
+                    this.closeModal();
+                });
+            }
+
+            // ==================== 开始新游戏 ====================
+            startNewGame() {
+                // 重置游戏状态
+                this.cards = [];
+                this.flippedCards = [];
+                this.matchedPairs = 0;
+                this.moves = 0;
+                this.time = 0;
+                this.isProcessing = false;
+                
+                // 停止计时器
+                if (this.timer) {
+                    clearInterval(this.timer);
+                    this.timer = null;
+                }
+                
+                // 更新显示
+                this.updateDisplay();
+                
+                // 重置助手统计并让助手说话
+                this.assistant.resetStats();
+                this.assistant.speak('start');
+                
+                // 生成卡牌
+                this.generateCards();
+                this.renderCards();
+            }
+
+            // ==================== 生成卡牌数据（洗牌算法）====================
+            generateCards() {
+                let totalPairs = Math.floor((this.difficulty * this.difficulty) / 2);
+                const selectedIcons = this.icons.slice(0, totalPairs);
+                
+                // 创建配对卡牌数组
+                const cardPairs = [];
+                selectedIcons.forEach((icon, index) => {
+                    cardPairs.push({ id: index, icon: icon });
+                    cardPairs.push({ id: index, icon: icon });
+                });
+                
+                // Fisher-Yates 洗牌算法（确保真随机）
+                this.cards = this.shuffleArray(cardPairs);
+                
+                // 5×5模式特殊处理：需要25张卡（12对+1张特殊卡）
+                if (this.difficulty === 5) {
+                    // 添加第13张特殊卡（不需要配对，点击即匹配）
+                    const specialIcon = this.icons[12]; // 使用第13个图标
+                    this.cards.push({ id: 'special', icon: specialIcon, isSpecial: true });
+                }
+            }
+
+            // ==================== Fisher-Yates 洗牌算法 ====================
+            shuffleArray(array) {
+                const shuffled = [...array];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled;
+            }
+
+            // ==================== 渲染卡牌到页面 ====================
+            renderCards() {
+                this.cardsGrid.innerHTML = '';
+                
+                this.cards.forEach((card, index) => {
+                    const cardElement = document.createElement('div');
+                    cardElement.className = 'card';
+                    cardElement.dataset.index = index;
+                    cardElement.dataset.id = card.id;
+                    
+                    cardElement.innerHTML = `
+                        <div class="card-face card-back">
+                            <i class="fas fa-question"></i>
+                        </div>
+                        <div class="card-face card-front">
+                            <i class="fas ${card.icon}"></i>
+                        </div>
+                    `;
+                    
+                    cardElement.addEventListener('click', () => this.flipCard(cardElement));
+                    this.cardsGrid.appendChild(cardElement);
+                });
+            }
+
+            // ==================== 翻牌逻辑 ====================
+            flipCard(cardElement) {
+                // 防止无效点击
+                if (this.isProcessing || 
+                    cardElement.classList.contains('flipped') || 
+                    cardElement.classList.contains('matched')) {
+                    return;
+                }
+                
+                // 如果已经翻了两张牌，不能再翻第三张
+                if (this.flippedCards.length >= 2) {
+                    return;
+                }
+
+                // 第一次翻牌时启动计时器
+                if (this.moves === 0 && this.time === 0) {
+                    this.startTimer();
+                }
+
+                // 翻转卡牌
+                cardElement.classList.add('flipped');
+                this.flippedCards.push(cardElement);
+                this.playSound('flip');
+
+                // 检查配对
+                if (this.flippedCards.length === 2) {
+                    this.moves++;
+                    this.updateDisplay();
+                    this.checkMatch();
+                }
+            }
+
+            // ==================== 检查卡牌配对 ====================
+            checkMatch() {
+                this.isProcessing = true;
+                const [card1, card2] = this.flippedCards;
+                const cardData1 = this.cards[card1.dataset.index];
+                const cardData2 = this.cards[card2.dataset.index];
+                const id1 = card1.dataset.id;
+                const id2 = card2.dataset.id;
+
+                // 检查是否有特殊卡牌（5x5模式中的第13张卡）
+                const isSpecial1 = cardData1 && cardData1.isSpecial;
+                const isSpecial2 = cardData2 && cardData2.isSpecial;
+
+                if (id1 === id2 || isSpecial1 || isSpecial2) {
+                    // 配对成功（或点击了特殊卡牌）
+                    setTimeout(() => {
+                        card1.classList.add('matched');
+                        card2.classList.add('matched');
+                        this.matchedPairs++;
+                        this.playSound('match');
+                        this.createParticles(card1);
+                        this.createParticles(card2);
+                        this.flippedCards = [];
+                        this.isProcessing = false;
+                        
+                        // 助手记录成功并说话
+                        this.assistant.recordSuccess();
+                        this.assistant.speak('success');
+                        
+                        // 检查是否胜利
+                        this.checkWin();
+                    }, 500);
+                } else {
+                    // 配对失败，1秒后翻回
+                    setTimeout(() => {
+                        card1.classList.remove('flipped');
+                        card2.classList.remove('flipped');
+                        this.flippedCards = [];
+                        this.isProcessing = false;
+                        this.playSound('miss');
+                        
+                        // 助手记录失败并说话
+                        this.assistant.recordFail();
+                        this.assistant.speak('fail');
+                    }, 1000);
+                }
+            }
+
+            // ==================== 检查胜利条件 ====================
+            checkWin() {
+                let totalPairs = Math.floor((this.difficulty * this.difficulty) / 2);
+                
+                // 5x5模式特殊处理：12对+1张特殊卡=13次成功翻转
+                if (this.difficulty === 5) {
+                    totalPairs = 13;
+                }
+                
+                if (this.matchedPairs === totalPairs) {
+                    // 停止计时器
+                    clearInterval(this.timer);
+                    
+                    // 播放胜利音效
+                    this.playSound('win');
+                    
+                    // 助手庆祝胜利
+                    this.assistant.speak('win');
+                    
+                    // 延迟显示弹窗
+                    setTimeout(() => {
+                        this.showWinModal();
+                    }, 500);
+                    
+                    // 保存最佳成绩
+                    this.saveBestScore();
+                }
+            }
+
+            // ==================== 显示胜利弹窗 ====================
+            showWinModal() {
+                let perfectMoves = (this.difficulty * this.difficulty) / 2;
+                
+                // 5x5模式特殊处理：13次成功翻转
+                if (this.difficulty === 5) {
+                    perfectMoves = 13;
+                }
+                
+                const accuracy = Math.round((perfectMoves / this.moves) * 100);
+                
+                document.getElementById('modalTime').textContent = this.formatTime(this.time);
+                document.getElementById('modalMoves').textContent = this.moves;
+                document.getElementById('modalAccuracy').textContent = accuracy + '%';
+                
+                this.modalOverlay.classList.add('show');
+            }
+
+            closeModal() {
+                this.modalOverlay.classList.remove('show');
+            }
+
+            // ==================== 计时器相关 ====================
+            startTimer() {
+                this.timer = setInterval(() => {
+                    this.time++;
+                    this.updateDisplay();
+                }, 1000);
+            }
+
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            // ==================== 更新显示 ====================
+            updateDisplay() {
+                this.timeDisplay.textContent = this.formatTime(this.time);
+                this.movesDisplay.textContent = this.moves;
+            }
+
+            // ==================== 本地存储：保存最佳成绩 ====================
+            saveBestScore() {
+                const storageKey = `best_score_${this.difficulty}x${this.difficulty}`;
+                const currentScore = {
+                    time: this.time,
+                    moves: this.moves
+                };
+                
+                const bestScore = localStorage.getItem(storageKey);
+                
+                if (!bestScore) {
+                    localStorage.setItem(storageKey, JSON.stringify(currentScore));
+                    this.loadBestScore();
+                } else {
+                    const best = JSON.parse(bestScore);
+                    // 比较：步数更少或步数相同但时间更短
+                    if (this.moves < best.moves || (this.moves === best.moves && this.time < best.time)) {
+                        localStorage.setItem(storageKey, JSON.stringify(currentScore));
+                        this.loadBestScore();
+                    }
+                }
+            }
+
+            // ==================== 本地存储：加载最佳成绩 ====================
+            loadBestScore() {
+                const storageKey = `best_score_${this.difficulty}x${this.difficulty}`;
+                const bestScore = localStorage.getItem(storageKey);
+                
+                if (bestScore) {
+                    const best = JSON.parse(bestScore);
+                    this.bestDisplay.textContent = `${best.moves}步/${this.formatTime(best.time)}`;
+                } else {
+                    this.bestDisplay.textContent = '--';
+                }
+            }
+
+            // ==================== 主题切换 ====================
+            toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const themeIcon = document.querySelector('#themeToggle i');
+                
+                if (currentTheme === 'dark') {
+                    document.documentElement.removeAttribute('data-theme');
+                    themeIcon.className = 'fas fa-moon';
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    themeIcon.className = 'fas fa-sun';
+                    localStorage.setItem('theme', 'dark');
+                }
+            }
+
+            // ==================== 音效控制 ====================
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                const soundIcon = document.querySelector('#soundToggle i');
+                
+                if (this.soundEnabled) {
+                    soundIcon.className = 'fas fa-volume-up';
+                } else {
+                    soundIcon.className = 'fas fa-volume-mute';
+                }
+            }
+
+            // ==================== 播放音效（使用Web Audio API）====================
+            playSound(type) {
+                if (!this.soundEnabled) return;
+
+                try {
+                    // 复用AudioContext实例，避免每次创建
+                    if (!this.audioContext) {
+                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    
+                    // 如果AudioContext被挂起，恢复它
+                    if (this.audioContext.state === 'suspended') {
+                        this.audioContext.resume();
+                    }
+
+                    // 根据不同类型设置不同音效
+                    switch(type) {
+                        case 'flip':
+                            this.playTone(400, 0.1, 0.1);
+                            break;
+                        case 'match':
+                            this.playTone(600, 0.15, 0.2);
+                            break;
+                        case 'miss':
+                            this.playTone(200, 0.1, 0.15);
+                            break;
+                        case 'win':
+                            // 胜利音效（连续的音符）
+                            const notes = [523, 587, 659, 784];
+                            notes.forEach((freq, index) => {
+                                setTimeout(() => {
+                                    this.playTone(freq, 0.1, 0.3);
+                                }, index * 150);
+                            });
+                            break;
+                    }
+                } catch (error) {
+                    console.warn('音效播放失败:', error);
+                }
+            }
+
+            // 播放单个音调
+            playTone(frequency, volume, duration) {
+                if (!this.audioContext) return;
+                
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                // 音量渐变，避免突然开始/结束的爆音
+                gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.01);
+                gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+            }
+
+            // ==================== 粒子特效 ====================
+            createParticles(cardElement) {
+                const rect = cardElement.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                // 创建8个粒子
+                for (let i = 0; i < 8; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = centerX + 'px';
+                    particle.style.top = centerY + 'px';
+                    
+                    // 随机方向
+                    const angle = (Math.PI * 2 * i) / 8;
+                    const distance = 50 + Math.random() * 30;
+                    const tx = Math.cos(angle) * distance;
+                    const ty = Math.sin(angle) * distance;
+                    
+                    particle.style.setProperty('--tx', tx + 'px');
+                    particle.style.setProperty('--ty', ty + 'px');
+                    
+                    document.body.appendChild(particle);
+                    
+                    // 动画结束后移除
+                    setTimeout(() => particle.remove(), 1000);
+                }
+            }
+        }
+
+        // ==================== 嘴碎小助手类 ====================
+        class GameAssistant {
+            constructor() {
+                this.avatar = document.getElementById('assistantAvatar');
+                this.dialog = document.getElementById('assistantDialog');
+                this.text = document.getElementById('assistantText');
+                this.typingInterval = null;
+                this.recentPhrases = []; // 记录最近使用的台词
+                this.maxRecent = 5; // 记录最近5条
+
+                // 丰富的台词库
+                this.phrases = {
+                    start: [
+                        "准备好了吗？开始吧！",
+                        "新游戏开始了，祝你好运！",
+                        "这次能打破记录吗？加油！"
+                    ],
+                    fail: [
+                        "哎呀！这记忆不太行啊~",
+                        "再想想，别急着翻~",
+                        "这局看来有点难哦？",
+                        "刚才那张卡你没记住吧？",
+                        "加油，集中注意力！",
+                        "这都被你翻出来了？",
+                        "别急，慢慢来~",
+                        "哈哈，失误了吧！",
+                        "这记忆力还需要锻炼啊~",
+                        "没关系，下次记住就好！",
+                        "哎呀呀，又翻错了~",
+                        "这卡牌怎么这么难记？",
+                        "你的大脑还在预热吗？",
+                        "仔细点，别马虎~",
+                        "看来今天不在状态啊~"
+                    ],
+                    success: [
+                        "漂亮！就这样保持！",
+                        "厉害！记性不错嘛~",
+                        "这波操作很稳！",
+                        "继续，你能行的！",
+                        "好样的，再接再厉！",
+                        "记忆力超群啊！",
+                        "太棒了！继续保持！",
+                        "这反应速度可以啊！",
+                        "不错不错，越来越熟练了！",
+                        "这就是实力！",
+                        "完美的一对！",
+                        "你今天状态不错！",
+                        "这个配对很精准！",
+                        "继续加油，马上就要赢了！",
+                        "这就是高手的表现！"
+                    ],
+                    consecutiveSuccess: [
+                        "连对三局了！太强了！",
+                        "这是要一波流啊！",
+                        "势不可挡啊！",
+                        "今天这是开挂了吗？",
+                        "节奏完全掌控了！"
+                    ],
+                    win: [
+                        "太棒了！恭喜通关！",
+                        "恭喜你！真是精彩！",
+                        "完美通关！你太厉害了！",
+                        "这表现，无可挑剔！",
+                        "大神级别！膜拜！"
+                    ],
+                    consecutiveFail: [
+                        "别灰心，调整一下节奏~",
+                        "深呼吸，慢慢来~",
+                        "休息一下眼睛，再试试？"
+                    ]
+                };
+
+                // 表情映射
+                this.expressions = {
+                    default: "😊",
+                    thinking: "🤔",
+                    happy: "😄",
+                    celebrate: "🎉",
+                    cheeky: "😏",
+                    worried: "🤔",
+                    trophy: "🏆"
+                };
+
+                // 统计状态
+                this.consecutiveSuccess = 0;
+                this.consecutiveFail = 0;
+            }
+
+            // 说话（打字机效果）
+            speak(type, forcePhrase = null) {
+                // 清除之前的打字
+                if (this.typingInterval) {
+                    clearInterval(this.typingInterval);
+                }
+
+                // 获取台词
+                let phrase;
+                if (forcePhrase) {
+                    phrase = forcePhrase;
+                } else {
+                    phrase = this.getRandomPhrase(type);
+                }
+
+                // 更新表情
+                this.updateExpression(type);
+
+                // 显示对话框
+                this.dialog.classList.add('show');
+
+                // 打字机效果
+                let index = 0;
+                this.text.textContent = '';
+                this.text.classList.add('assistant-typing');
+
+                this.typingInterval = setInterval(() => {
+                    if (index < phrase.length) {
+                        this.text.textContent += phrase.charAt(index);
+                        index++;
+                    } else {
+                        clearInterval(this.typingInterval);
+                        this.text.classList.remove('assistant-typing');
+                    }
+                }, 50); // 每50ms显示一个字符
+
+                // 5秒后自动隐藏
+                setTimeout(() => {
+                    this.dialog.classList.remove('show');
+                }, 5000);
+            }
+
+            // 获取随机台词（防重复）
+            getRandomPhrase(type) {
+                const phrases = this.phrases[type];
+                if (!phrases || phrases.length === 0) return '';
+
+                // 过滤掉最近使用的台词
+                const available = phrases.filter(p => !this.recentPhrases.includes(p));
+                
+                // 如果所有台词都用过了，清空记录
+                if (available.length === 0) {
+                    this.recentPhrases = [];
+                    return phrases[Math.floor(Math.random() * phrases.length)];
+                }
+
+                // 从可用台词中随机选择
+                const phrase = available[Math.floor(Math.random() * available.length)];
+                
+                // 更新最近使用记录
+                this.recentPhrases.push(phrase);
+                if (this.recentPhrases.length > this.maxRecent) {
+                    this.recentPhrases.shift();
+                }
+
+                return phrase;
+            }
+
+            // 更新表情
+            updateExpression(type) {
+                let expression;
+                switch(type) {
+                    case 'start':
+                        expression = this.expressions.thinking;
+                        break;
+                    case 'success':
+                        expression = this.expressions.happy;
+                        break;
+                    case 'consecutiveSuccess':
+                        expression = this.expressions.celebrate;
+                        break;
+                    case 'fail':
+                        expression = this.expressions.cheeky;
+                        break;
+                    case 'consecutiveFail':
+                        expression = this.expressions.worried;
+                        break;
+                    case 'win':
+                        expression = this.expressions.trophy;
+                        break;
+                    default:
+                        expression = this.expressions.default;
+                }
+                this.avatar.textContent = expression;
+            }
+
+            // 重置统计
+            resetStats() {
+                this.consecutiveSuccess = 0;
+                this.consecutiveFail = 0;
+            }
+
+            // 记录成功
+            recordSuccess() {
+                this.consecutiveSuccess++;
+                this.consecutiveFail = 0;
+
+                // 连续3次成功触发特殊台词
+                if (this.consecutiveSuccess >= 3 && this.consecutiveSuccess % 3 === 0) {
+                    this.speak('consecutiveSuccess');
+                }
+            }
+
+            // 记录失败
+            recordFail() {
+                this.consecutiveFail++;
+                this.consecutiveSuccess = 0;
+
+                // 连续3次失败触发安慰台词
+                if (this.consecutiveFail >= 3 && this.consecutiveFail % 3 === 0) {
+                    this.speak('consecutiveFail');
+                }
+            }
+        }
+
+        // ==================== 页面加载完成后初始化游戏 ====================
+        window.addEventListener('DOMContentLoaded', () => {
+            // 加载保存的主题
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.querySelector('#themeToggle i').className = 'fas fa-sun';
+            }
+
+            // 初始化游戏
+            const game = new MemoryGame();
+        });
+    </script>
+</body>
+</html>
